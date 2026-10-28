@@ -1,0 +1,59 @@
+<div class="card compose shadow-lg border-0" id="compose" hidden aria-label="New message">
+  <div class="card-header compose-head d-flex align-items-center border-0" id="compose-head">
+    <span class="compose-title fw-semibold text-truncate me-auto" id="compose-title">New Message</span>
+    <button type="button" class="btn btn-icon btn-sm" id="compose-min" title="Minimize"><i class="bi bi-dash-lg"></i></button>
+    <button type="button" class="btn btn-icon btn-sm" id="compose-max" title="Full screen"><i class="bi bi-arrows-angle-expand"></i></button>
+    <button type="button" class="btn btn-icon btn-sm" id="compose-close" title="Save &amp; close"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <form id="compose-form" class="card-body compose-body d-flex flex-column p-0 px-3" autocomplete="off">
+    <input type="hidden" name="in_reply_to" id="c-in-reply-to">
+    <input type="hidden" name="draft_id" id="c-draft-id">
+    {% if accounts|length > 1 %}
+      <div class="c-field"><label for="c-account" class="text-body-secondary">From</label>
+        <select name="account_id" id="c-account" class="form-select form-select-sm border-0 shadow-none">
+          {% for a in accounts %}<option value="{{ a.pk }}"{% if a.pk == nav_account.pk %} selected{% endif %}>{{ a.from_header }}</option>{% endfor %}
+        </select>
+      </div>
+    {% else %}
+      <input type="hidden" name="account_id" id="c-account" value="{{ nav_account.pk }}">
+    {% endif %}
+    <div class="c-field">
+      <label for="c-to" class="text-body-secondary">To</label>
+      <input name="to" id="c-to" class="form-control-plaintext addr-input" type="text">
+      <button type="button" class="btn btn-link btn-sm link-secondary text-decoration-none px-1" id="c-show-cc">Cc</button>
+      <button type="button" class="btn btn-link btn-sm link-secondary text-decoration-none px-1" id="c-show-bcc">Bcc</button>
+    </div>
+    <div class="c-field" id="c-cc-row" hidden><label for="c-cc" class="text-body-secondary">Cc</label><input name="cc" id="c-cc" class="form-control-plaintext addr-input" type="text"></div>
+    <div class="c-field" id="c-bcc-row" hidden><label for="c-bcc" class="text-body-secondary">Bcc</label><input name="bcc" id="c-bcc" class="form-control-plaintext addr-input" type="text"></div>
+    <div class="c-field"><input name="subject" id="c-subject" class="form-control-plaintext" placeholder="Subject" type="text"></div>
+    <div class="c-editor" id="c-body" contenteditable="true" role="textbox" aria-multiline="true"></div>
+    <div class="d-flex flex-wrap gap-1 py-1" id="c-attachments"></div>
+    <div class="btn-toolbar c-format shadow-sm rounded-3 p-1 mb-2" id="c-format" role="toolbar" hidden>
+      <div class="btn-group btn-group-sm me-1">
+        <button type="button" class="btn btn-light" data-cmd="undo" title="Undo"><i class="bi bi-arrow-counterclockwise"></i></button>
+        <button type="button" class="btn btn-light" data-cmd="redo" title="Redo"><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
+      <div class="btn-group btn-group-sm me-1">
+        <button type="button" class="btn btn-light" data-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
+        <button type="button" class="btn btn-light" data-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
+        <button type="button" class="btn btn-light" data-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
+        <button type="button" class="btn btn-light" data-cmd="strikeThrough" title="Strikethrough"><i class="bi bi-type-strikethrough"></i></button>
+      </div>
+      <div class="btn-group btn-group-sm">
+        <button type="button" class="btn btn-light" data-cmd="insertOrderedList" title="Numbered list"><i class="bi bi-list-ol"></i></button>
+        <button type="button" class="btn btn-light" data-cmd="insertUnorderedList" title="Bulleted list"><i class="bi bi-list-ul"></i></button>
+        <button type="button" class="btn btn-light" data-cmd="formatBlock" data-arg="blockquote" title="Quote"><i class="bi bi-quote"></i></button>
+        <button type="button" class="btn btn-light" data-cmd="removeFormat" title="Remove formatting"><i class="bi bi-eraser"></i></button>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-1 pt-2 pb-3 border-top-0">
+      <button type="submit" class="btn btn-primary rounded-pill px-4 me-2 fw-semibold" id="c-send">Send</button>
+      <button type="button" class="btn btn-icon" id="c-format-toggle" title="Formatting options"><i class="bi bi-type"></i></button>
+      <label class="btn btn-icon mb-0" title="Attach files"><i class="bi bi-paperclip"></i><input type="file" id="c-files" multiple hidden></label>
+      <button type="button" class="btn btn-icon" id="c-link" title="Insert link"><i class="bi bi-link-45deg"></i></button>
+      <span class="ms-auto small text-body-secondary me-1" id="c-status"></span>
+      <button type="button" class="btn btn-icon" id="c-discard" title="Discard draft"><i class="bi bi-trash"></i></button>
+    </div>
+  </form>
+  <div class="list-group suggest shadow" id="c-suggest" hidden></div>
+</div>

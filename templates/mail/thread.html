@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load mail_tags %}
+{% block title %}{{ subject }} - {{ BRAND.NAME }} {{ BRAND.PRODUCT }}{% endblock %}
+{% block content %}
+<div class="pane" id="thread" data-ids="{% for m in thread_msgs %}{{ m.pk }}{% if not forloop.last %},{% endif %}{% endfor %}" data-back="{{ back_url }}">
+  <div class="d-flex align-items-center gap-1 px-2 py-1 toolbar">
+    <a class="btn btn-icon" href="{{ back_url }}" id="back-btn" title="Back"><i class="bi bi-arrow-left"></i></a>
+    {% if msg.folder.role != "archive" and msg.folder.role != "trash" and msg.folder.role != "spam" %}
+      <button class="btn btn-icon" data-thread-action="archive" title="Archive"><i class="bi bi-archive"></i></button>
+    {% endif %}
+    {% if msg.folder.role == "spam" %}
+      <button class="btn btn-icon" data-thread-action="inbox" title="Not spam"><i class="bi bi-envelope-check"></i></button>
+    {% elif msg.folder.role != "trash" %}
+      <button class="btn btn-icon" data-thread-action="spam" title="Report spam"><i class="bi bi-exclamation-octagon"></i></button>
+    {% endif %}
+    {% if msg.folder.role == "trash" %}
+      <button class="btn btn-icon" data-thread-action="inbox" title="Move to Inbox"><i class="bi bi-inbox"></i></button>
+      <button class="btn btn-icon" data-thread-action="delete_forever" title="Delete forever"><i class="bi bi-trash3-fill"></i></button>
+    {% else %}
+      <button class="btn btn-icon" data-thread-action="trash" title="Delete"><i class="bi bi-trash"></i></button>
+    {% endif %}
+    <div class="vr mx-1 my-2"></div>
+    <button class="btn btn-icon" data-thread-action="unread" title="Mark as unread"><i class="bi bi-envelope"></i></button>
+    <div class="dropdown">
+      <button class="btn btn-icon" data-bs-toggle="dropdown" aria-expanded="false" title="Move to"><i class="bi bi-folder-symlink"></i></button>
+      <ul class="dropdown-menu shadow">
+        <li><h6 class="dropdown-header">Move to:</h6></li>
+        {% for f in move_targets %}
+          <li><button class="dropdown-item" data-thread-action="move" data-folder="{{ f.pk }}"><i class="bi bi-{{ f.icon }} me-2"></i>{{ f.label }}</button></li>
+        {% endfor %}
+      </ul>
+    </div>
+    <button class="btn btn-icon ms-auto" id="print-btn" title="Print all"><i class="bi bi-printer"></i></button>
+  </div>
+
+  <div class="thread-scroll">
+    <h1 class="thread-subject h4 fw-normal">{{ subject }}
+      {% for l in labels %}<span class="badge rounded-1 text-bg-secondary bg-opacity-25 text-body fw-normal fs-7 align-middle ms-2">{{ l.label }}</span>{% endfor %}
+    </h1>
+
+    {% for m in thread_msgs %}
+      <article class="msg {% if forloop.last or not m.is_read %}expanded{% else %}collapsed{% endif %}" data-id="{{ m.pk }}">
+        <div class="msg-head d-flex gap-3 align-items-start">
+          <span class="avatar avatar-lg" style="--c: {{ m.avatar_color }}">{{ m.avatar_letter }}</span>
+          <div class="msg-meta flex-grow-1 overflow-hidden">
+            <div class="text-truncate">
+              <span class="fw-semibold">{{ m.from_name|default:m.from_email }}</span>
+              {% if m.from_name %}<span class="small text-body-secondary">&lt;{{ m.from_email }}&gt;</span>{% endif %}
+            </div>
+            <div class="msg-to small text-body-secondary">
+              to {{ m.to|short_names:account.email|default:"undisclosed recipients" }}{% if m.cc %}, {{ m.cc|short_names:account.email }}{% endif %}
+              <button class="btn btn-sm btn-link link-secondary p-0 ms-1 details-btn" title="Show details"><i class="bi bi-caret-down-fill"></i></button>
+            </div>
+            <div class="msg-snippet text-body-secondary text-truncate">{{ m.snippet }}</div>
+          </div>
+          <div class="msg-right d-flex align-items-center gap-1 small text-body-secondary text-nowrap">
+            {% if m.has_attachments %}<i class="bi bi-paperclip"></i>{% endif %}
+            <span class="msg-date me-1" title="{{ m.date }}">{{ m.date|full_date }}</span>
+            <button class="btn star{% if m.is_starred %} on{% endif %}" data-id="{{ m.pk }}" data-single="1" title="Star"><i class="bi bi-star{% if m.is_starred %}-fill{% endif %}"></i></button>
+            <button class="btn btn-icon btn-sm" data-compose="reply" data-id="{{ m.pk }}" title="Reply"><i class="bi bi-reply"></i></button>
+            <div class="dropdown">
+              <button class="btn btn-icon btn-sm" data-bs-toggle="dropdown" aria-expanded="false" title="More"><i class="bi bi-three-dots-vertical"></i></button>
+              <ul class="dropdown-menu dropdown-menu-end shadow">
+                <li><button class="dropdown-item" data-compose="reply" data-id="{{ m.pk }}"><i class="bi bi-reply me-2"></i>Reply</button></li>
+                <li><button class="dropdown-item" data-compose="replyall" data-id="{{ m.pk }}"><i class="bi bi-reply-all me-2"></i>Reply all</button></li>
+                <li><button class="dropdown-item" data-compose="forward" data-id="{{ m.pk }}"><i class="bi bi-forward me-2"></i>Forward</button></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><button class="dropdown-item" data-msg-action="trash" data-id="{{ m.pk }}"><i class="bi bi-trash me-2"></i>Delete this message</button></li>
+                <li><button class="dropdown-item" data-msg-action="unread" data-id="{{ m.pk }}"><i class="bi bi-envelope me-2"></i>Mark unread from here</button></li>
+                <li><a class="dropdown-item" href="{% url 'message_body' m.pk %}" target="_blank"><i class="bi bi-box-arrow-up-right me-2"></i>Open in new window</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="msg-details card card-body shadow-sm py-2 px-3 my-2 small" hidden>
+          <table class="table table-sm table-borderless mb-0">
+            <tr><th class="text-body-secondary fw-normal text-end">from:</th><td>{{ m.from_name }} &lt;{{ m.from_email }}&gt;</td></tr>
+            {% if m.reply_to %}<tr><th class="text-body-secondary fw-normal text-end">reply-to:</th><td>{{ m.reply_to }}</td></tr>{% endif %}
+            <tr><th class="text-body-secondary fw-normal text-end">to:</th><td>{{ m.to }}</td></tr>
+            {% if m.cc %}<tr><th class="text-body-secondary fw-normal text-end">cc:</th><td>{{ m.cc }}</td></tr>{% endif %}
+            {% if m.bcc %}<tr><th class="text-body-secondary fw-normal text-end">bcc:</th><td>{{ m.bcc }}</td></tr>{% endif %}
+            <tr><th class="text-body-secondary fw-normal text-end">date:</th><td>{{ m.date|date:"N j, Y, g:i A" }}</td></tr>
+            <tr><th class="text-body-secondary fw-normal text-end">subject:</th><td>{{ m.subject }}</td></tr>
+            <tr><th class="text-body-secondary fw-normal text-end">folder:</th><td>{{ m.folder.label }}</td></tr>
+          </table>
+        </div>
+        <div class="msg-body">
+          <div class="body-wrap"><iframe class="body-frame" title="Message body" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                  data-src="{% url 'message_body' m.pk %}"></iframe></div>
+          {% with atts=m.attachments.all %}
+            {% if atts %}
+              <div class="attachments border-top border-dashed mt-3 pt-3">
+                <div class="fw-semibold small mb-2 text-body-secondary">{{ atts|length }} attachment{{ atts|length|pluralize }}</div>
+                <div class="d-flex flex-wrap gap-3">
+                  {% for a in atts %}{% if not a.is_inline %}
+                    <a class="card att-card text-decoration-none" href="{% url 'attachment' a.pk %}" title="Download {{ a.filename }}">
+                      {% if a.content_type|slice:":6" == "image/" %}
+                        <img class="card-img-top" src="{% url 'attachment' a.pk %}?inline=1" alt="" loading="lazy">
+                      {% else %}
+                        <div class="att-preview bg-body-tertiary"><i class="bi bi-{{ a.icon }}"></i><span class="att-ext">{{ a.extension }}</span></div>
+                      {% endif %}
+                      <div class="card-body p-2">
+                        <div class="small text-truncate text-body"><i class="bi bi-{{ a.icon }} me-1 text-danger"></i>{{ a.filename }}</div>
+                        <div class="text-body-secondary att-size">{{ a.size|filesize }}</div>
+                      </div>
+                    </a>
+                  {% endif %}{% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          {% endwith %}
+        </div>
+      </article>
+    {% endfor %}
+
+    <div class="d-flex flex-wrap gap-2 py-4 reply-bar">
+      <button class="btn btn-outline-secondary rounded-pill px-4" data-compose="reply" data-id="{{ last.pk }}"><i class="bi bi-reply me-2"></i>Reply</button>
+      {% if last|recipients_count > 1 %}<button class="btn btn-outline-secondary rounded-pill px-4" data-compose="replyall" data-id="{{ last.pk }}"><i class="bi bi-reply-all me-2"></i>Reply all</button>{% endif %}
+      <button class="btn btn-outline-secondary rounded-pill px-4" data-compose="forward" data-id="{{ last.pk }}"><i class="bi bi-forward me-2"></i>Forward</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

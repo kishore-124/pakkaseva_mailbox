@@ -1,0 +1,7 @@
+Django==6.1.2
+psycopg[binary]==3.3.6
+gunicorn==26.2.0
+whitenoise==6.12.0
+nh3==0.3.7
+cryptography==50.0.2
+paramiko==5.1.0

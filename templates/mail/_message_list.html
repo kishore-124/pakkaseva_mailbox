@@ -1,0 +1,63 @@
+{% load mail_tags %}
+  <div class="message-list" id="message-list" data-page="{{ page.number }}">
+    {% for m in page %}
+      <div class="mail-row{% if m.row_unread %} unread{% endif %}{% if m.is_starred %} starred{% endif %}{% if m.file_atts %} has-chips{% endif %}" data-id="{{ m.pk }}" role="link" tabindex="-1"
+           {% if view == "drafts" %}data-draft="{{ m.pk }}"{% else %}data-href="{% url 'thread' m.pk %}?back={{ back_url|urlencode }}"{% endif %}>
+        <span class="row-check"><input class="form-check-input row-cb m-0" type="checkbox" value="{{ m.pk }}" aria-label="Select conversation"></span>
+        <span class="row-avatar avatar" style="--c: {{ m.avatar_color }}" aria-hidden="true">{% if view == "drafts" %}<i class="bi bi-pencil"></i>{% else %}{{ m.avatar_letter }}{% endif %}</span>
+        <div class="row-main">
+          <div class="row-top">
+            <span class="from">
+              {% if view == "drafts" %}<span class="draft-tag">Draft</span> {{ m.to|short_names:nav_account.email|default:"(no recipients)" }}
+              {% elif m.show_recipient %}To {{ m.to|short_names:nav_account.email|default:"(no recipients)" }}
+              {% elif m.from_email|lower == nav_account.email|lower %}me
+              {% else %}{{ m.sender_label }}{% endif %}
+              {% if m.thread_count > 1 %}<span class="thread-count">{{ m.thread_count }}</span>{% endif %}
+            </span>
+            <span class="row-meta">
+              {% if m.has_attachments %}<i class="bi bi-paperclip att-icon" title="Has attachment"></i>{% endif %}
+              <span class="date" title="{{ m.date|full_date }}">{{ m.date|mail_date }}</span>
+              <span class="unread-dot" aria-label="Unread"></span>
+            </span>
+          </div>
+          <div class="row-bottom">
+            <span class="summary">
+              {% if view == "search" or view == "starred" or view == "all" %}{% if m.folder.role != "sent" %}<span class="folder-chip">{{ m.folder.label }}</span>{% endif %}{% endif %}
+              <span class="subject">{{ m.subject|default:"(no subject)" }}</span>
+              {% if m.snippet %}<span class="snippet">{{ m.snippet }}</span>{% endif %}
+            </span>
+            <button class="btn star{% if m.is_starred %} on{% endif %}" data-id="{{ m.pk }}" title="{% if m.is_starred %}Starred{% else %}Not starred{% endif %}"><i class="bi bi-star{% if m.is_starred %}-fill{% endif %}"></i></button>
+          </div>
+          {% if m.file_atts %}
+            <div class="att-chips">
+              {% for a in m.file_atts|slice:":3" %}
+                <a class="att-chip" href="{% url 'attachment' a.pk %}" title="{{ a.filename }} ({{ a.size|filesize }})"><i class="bi bi-{{ a.icon }}"></i><span>{{ a.filename }}</span></a>
+              {% endfor %}
+              {% if m.file_atts|length > 3 %}<span class="att-chip more">+{{ m.file_atts|length|add:"-3" }}</span>{% endif %}
+            </div>
+          {% endif %}
+        </div>
+        <div class="hover-actions">
+          {% if view == "drafts" %}
+            <button class="btn btn-icon btn-sm" data-row-action="discard" title="Discard draft"><i class="bi bi-trash"></i></button>
+          {% else %}
+            {% if view != "archive" and view != "trash" and view != "spam" %}<button class="btn btn-icon btn-sm" data-row-action="archive" title="Archive"><i class="bi bi-archive"></i></button>{% endif %}
+            <button class="btn btn-icon btn-sm" data-row-action="{% if view == 'trash' %}delete_forever{% else %}trash{% endif %}" title="Delete"><i class="bi bi-trash"></i></button>
+            <button class="btn btn-icon btn-sm" data-row-action="{% if m.row_unread %}read{% else %}unread{% endif %}" title="Mark as {% if m.row_unread %}read{% else %}unread{% endif %}"><i class="bi bi-{% if m.row_unread %}envelope-open{% else %}envelope{% endif %}"></i></button>
+          {% endif %}
+        </div>
+      </div>
+    {% empty %}
+      <div class="empty-state">
+        <i class="bi bi-{% if query %}search{% elif view == 'inbox' %}check2-circle{% elif view == 'spam' %}shield-check{% else %}inbox{% endif %}"></i>
+        {% if query %}<h2>No matches</h2><p>Nothing matched “{{ query }}”. Try fewer words, or search in all folders with <code>in:anywhere</code>.</p>
+        {% elif not nav_account.last_synced_at %}<h2><span class="spinner-border spinner-border-sm me-2"></span>Downloading your mail</h2><p>This page fills in by itself as messages arrive.</p>
+        {% elif view == "inbox" %}<h2>Inbox zero</h2><p>Nothing waiting for you. New mail appears here automatically.</p>
+        {% elif view == "starred" %}<h2>No starred mail</h2><p>Star a conversation to keep it here for later.</p>
+        {% elif view == "drafts" %}<h2>No drafts</h2><p>Unsent messages are saved here while you write.</p>
+        {% elif view == "spam" %}<h2>No spam</h2><p>Messages marked as spam end up here.</p>
+        {% elif view == "trash" %}<h2>Trash is empty</h2><p>Deleted conversations stay here until you delete them forever.</p>
+        {% else %}<h2>Nothing here</h2><p>This folder has no conversations.</p>{% endif %}
+      </div>
+    {% endfor %}
+  </div>

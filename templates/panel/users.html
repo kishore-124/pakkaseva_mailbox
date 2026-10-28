@@ -1,0 +1,113 @@
+{% extends "panel/base.html" %}
+{% block panel_title %}Users{% endblock %}
+{% block content %}
+<div class="pane">
+  <div class="pane-head">
+    <h1 class="pane-title">Users</h1>
+    <span class="pane-sub">Everyone who can sign in to {{ BRAND.NAME }} {{ BRAND.PRODUCT }}</span>
+  </div>
+  <div class="toolbar flex-wrap gap-2">
+    <div class="filter-bar mb-0 me-auto">
+      <a href="?" class="{% if not filter %}active{% endif %}">All <span class="count">{{ stats.total }}</span></a>
+      <a href="?filter=admins" class="{% if filter == 'admins' %}active{% endif %}">Administrators <span class="count">{{ stats.admins }}</span></a>
+      <a href="?filter=linux" class="{% if filter == 'linux' %}active{% endif %}">On Ubuntu server <span class="count">{{ stats.linux }}</span></a>
+      <a href="?filter=inactive" class="{% if filter == 'inactive' %}active{% endif %}">Inactive <span class="count">{{ stats.inactive }}</span></a>
+    </div>
+    <form class="d-flex gap-2" method="get" role="search">
+      {% if filter %}<input type="hidden" name="filter" value="{{ filter }}">{% endif %}
+      <div class="input-group input-group-sm">
+        <span class="input-group-text bg-transparent"><i class="bi bi-search"></i></span>
+        <input class="form-control" name="q" value="{{ q }}" placeholder="Search users" aria-label="Search users">
+      </div>
+    </form>
+    <a class="btn btn-primary btn-sm px-3" href="{% url 'panel_user_create' %}"><i class="bi bi-person-plus me-1"></i>Add user</a>
+  </div>
+  <div class="panel-body">
+    {% if not linux_enabled %}
+      <div class="pane-note mx-0 mt-0 mb-3 align-items-center">
+        <i class="bi bi-hdd-network"></i>
+        <div class="flex-grow-1">Creating users on the Ubuntu server isn't set up yet.</div>
+        <a class="btn btn-sm btn-outline-primary" href="{% url 'panel_server' %}">Set up server connection</a>
+      </div>
+    {% endif %}
+    <div class="card overflow-hidden">
+      <div class="table-responsive">
+        <table class="table table-hover user-table mb-0 align-middle">
+          <thead class="table-head">
+            <tr><th>User</th><th class="d-none d-md-table-cell">Role</th><th>Ubuntu server</th><th class="d-none d-lg-table-cell">Mail accounts</th><th class="d-none d-lg-table-cell">Last sign-in</th><th class="text-end">Actions</th></tr>
+          </thead>
+          <tbody>
+          {% for u in page %}
+            <tr data-href="{% url 'panel_user' u.pk %}">
+              <td>
+                <div class="d-flex align-items-center gap-3">
+                  <span class="avatar" style="--c: {% if u.is_active %}#0c8b96{% else %}#74878a{% endif %}">{{ u.get_full_name|default:u.email|default:u.username|first|upper }}</span>
+                  <div class="text-truncate">
+                    <a class="fw-semibold text-body text-decoration-none" href="{% url 'panel_user' u.pk %}">{{ u.get_full_name|default:u.email|default:u.username }}</a>
+                    {% if u.pk == request.user.pk %}<span class="role-pill ms-1">you</span>{% endif %}
+                    <div class="small text-body-secondary text-truncate">{% if u.email %}{{ u.email }}{% else %}<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> no email - cannot sign in</span>{% endif %}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="d-none d-md-table-cell">
+                {% if u.is_superuser %}<span class="role-pill super">Owner</span>
+                {% elif u.is_staff %}<span class="role-pill admin">Administrator</span>
+                {% else %}<span class="role-pill">Member</span>{% endif %}
+                {% if not u.is_active %}<span class="role-pill off">Inactive</span>{% endif %}
+              </td>
+              <td>
+                {% with la=u.linux_account %}
+                  {% if la %}
+                    <span class="status-dot {% if la.status == 'active' %}bg-success{% elif la.status == 'locked' %}bg-warning{% else %}bg-danger{% endif %}"></span><code>{{ la.username }}</code>
+                    <span class="small text-body-secondary ms-1">{{ la.get_status_display }}</span>
+                  {% else %}
+                    <span class="text-body-secondary small">—</span>
+                  {% endif %}
+                {% endwith %}
+              </td>
+              <td class="d-none d-lg-table-cell">{{ u.n_accounts }}</td>
+              <td class="d-none d-lg-table-cell small text-body-secondary">{% if u.last_login %}{{ u.last_login|timesince }} ago{% else %}never{% endif %}</td>
+              <td class="text-end text-nowrap">
+                <a class="btn btn-icon btn-sm" href="{% url 'panel_user' u.pk %}" title="Open"><i class="bi bi-pencil"></i></a>
+                {% if u.pk != request.user.pk %}
+                  <form method="post" action="{% url 'panel_user_toggle' u.pk %}" class="d-inline"
+                        data-confirm="{% if u.is_active %}Deactivate {{ u.email|default:u.username }}? They will not be able to sign in{% if u.linux_account %}, and the Linux user '{{ u.linux_account.username }}' will be locked{% endif %}.{% else %}Activate {{ u.email|default:u.username }} again{% if u.linux_account %} and unlock the Linux user{% endif %}?{% endif %}"
+                        data-confirm-ok="{% if u.is_active %}Deactivate{% else %}Activate{% endif %}">
+                    {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="btn btn-icon btn-sm" type="submit" title="{% if u.is_active %}Deactivate{% else %}Activate{% endif %}"><i class="bi bi-{% if u.is_active %}person-slash{% else %}person-check{% endif %}"></i></button>
+                  </form>
+                  <button class="btn btn-icon btn-sm text-danger" type="button" title="Delete"
+                          data-bs-toggle="modal" data-bs-target="#delete-user"
+                          data-url="{% url 'panel_user_delete' u.pk %}" data-email="{{ u.email|default:u.username }}"
+                          data-name="{{ u.get_full_name|default:u.email|default:u.username }}" data-mail="{{ u.n_accounts }}"
+                          data-linux="{{ u.linux_account.username|default:'' }}"><i class="bi bi-trash"></i></button>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="text-center text-body-secondary py-5"><i class="bi bi-people display-6 d-block opacity-25 mb-2"></i>No users found.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% if page.paginator.num_pages > 1 %}
+      <nav class="mt-3 d-flex justify-content-between align-items-center small text-body-secondary">
+        <span>{{ page.start_index }}–{{ page.end_index }} of {{ page.paginator.count }}</span>
+        <ul class="pagination pagination-sm mb-0">
+          {% if page.has_previous %}<li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&filter={{ filter }}&page={{ page.previous_page_number }}">Previous</a></li>{% endif %}
+          {% if page.has_next %}<li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&filter={{ filter }}&page={{ page.next_page_number }}">Next</a></li>{% endif %}
+        </ul>
+      </nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{% include "panel/_delete_modal.html" %}
+<script>
+  document.querySelectorAll(".user-table tbody tr[data-href]").forEach(tr => tr.addEventListener("click", (e) => {
+    if (!e.target.closest("a, button, form, input")) window.location.href = tr.dataset.href;
+  }));
+</script>
+{% endblock %}

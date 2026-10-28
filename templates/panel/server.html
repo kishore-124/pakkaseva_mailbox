@@ -1,0 +1,82 @@
+{% extends "panel/base.html" %}
+{% block panel_title %}Ubuntu server{% endblock %}
+{% block content %}
+<div class="pane">
+  <div class="pane-head">
+    <h1 class="pane-title">Ubuntu server</h1><span class="pane-sub">Where new Linux users are created</span>
+  </div>
+  <div class="panel-body">
+    <div class="row g-3" style="max-width: 1200px">
+      <div class="col-lg-5">
+        <div class="card rounded-4 mb-3">
+          <div class="card-header bg-transparent fw-semibold py-3 d-flex align-items-center">
+            Connection
+            <span class="ms-auto badge rounded-pill {% if enabled %}text-bg-success{% else %}text-bg-secondary{% endif %}">{% if enabled %}Configured{% else %}Not configured{% endif %}</span>
+          </div>
+          <div class="card-body">
+            <dl class="row small mb-3">
+              <dt class="col-5 text-body-secondary fw-normal">Enabled</dt><dd class="col-7">{{ cfg.ENABLED|yesno:"Yes,No" }}</dd>
+              <dt class="col-5 text-body-secondary fw-normal">Server</dt><dd class="col-7"><code>{{ cfg.SSH_USER|default:"?" }}@{{ cfg.SSH_HOST|default:"(not set)" }}:{{ cfg.SSH_PORT }}</code></dd>
+              <dt class="col-5 text-body-secondary fw-normal">Sign-in</dt><dd class="col-7">{{ auth_kind }}</dd>
+              <dt class="col-5 text-body-secondary fw-normal">Host key check</dt>
+              <dd class="col-7">{% if host_key_checked %}<span class="text-success"><i class="bi bi-shield-check"></i> on</span>{% else %}<span class="text-warning-emphasis"><i class="bi bi-shield-exclamation"></i> trust on first use</span>{% endif %}</dd>
+              <dt class="col-5 text-body-secondary fw-normal">Helper</dt><dd class="col-7"><code>{% if cfg.USE_SUDO %}sudo {% endif %}{{ cfg.HELPER }}</code></dd>
+              <dt class="col-5 text-body-secondary fw-normal">New users get</dt><dd class="col-7"><code>{{ cfg.DEFAULT_SHELL }}</code>{% if cfg.DEFAULT_GROUPS %}, groups <code>{{ cfg.DEFAULT_GROUPS }}</code>{% endif %}</dd>
+            </dl>
+            <form method="post">{% csrf_token %}
+              <button class="btn btn-primary rounded-pill px-4" {% if not enabled %}disabled{% endif %}><i class="bi bi-plug me-1"></i>Test connection</button>
+            </form>
+            {% if result %}
+              <div class="alert {% if result.ok %}alert-success{% else %}alert-danger{% endif %} small mt-3 mb-0">
+                {% if result.ok %}
+                  <i class="bi bi-check-circle-fill me-1"></i><strong>Connected.</strong> Server replied: <code>{{ result.text }}</code>
+                  {% if not host_key_checked %}
+                    <hr class="my-2">To pin this server's identity, add to <code>.env</code>:<br>
+                    <code class="user-select-all">LINUX_SSH_HOST_FINGERPRINT={{ result.fingerprint }}</code>
+                  {% endif %}
+                {% else %}
+                  <i class="bi bi-x-circle-fill me-1"></i><strong>Failed:</strong> {{ result.text }}
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        {% if enabled and not host_key_checked %}
+          <div class="alert alert-warning small rounded-4"><i class="bi bi-shield-exclamation me-1"></i>
+            The server's identity is not verified. Run <b>Test connection</b>, then put the fingerprint it shows into
+            <code>LINUX_SSH_HOST_FINGERPRINT</code> so the app can't be tricked into sending passwords to another machine.</div>
+        {% endif %}
+      </div>
+
+      <div class="col-lg-7">
+        <div class="card rounded-4">
+          <div class="card-header bg-transparent fw-semibold py-3"><i class="bi bi-list-check me-2"></i>One-time setup</div>
+          <div class="card-body small">
+            <p>The app never runs <code>useradd</code> as root directly. It logs in over SSH as a normal user and runs one small helper script through sudo. The helper only manages ordinary users (UID 1000 and above) and refuses root and system accounts.</p>
+            <ol class="ps-3">
+              <li class="mb-3"><strong>On the Ubuntu server</strong>, create the SSH user and install the helper (it is in the project at <code>tools/server/mailbox-user</code>):
+<pre class="cmd mt-2 mb-0">sudo adduser --disabled-password --gecos "" mailboxadm
+sudo install -o root -g root -m 0755 mailbox-user /usr/local/sbin/mailbox-user
+echo 'mailboxadm ALL=(root) NOPASSWD: /usr/local/sbin/mailbox-user' | sudo tee /etc/sudoers.d/mailbox-user
+sudo chmod 0440 /etc/sudoers.d/mailbox-user
+sudo visudo -c</pre></li>
+              <li class="mb-3"><strong>On the machine running Docker</strong>, create a key and allow it on the server:
+<pre class="cmd mt-2 mb-0">mkdir -p ssh && ssh-keygen -t ed25519 -N "" -f ssh/id_ed25519 -C mailbox-app
+# copy ssh/id_ed25519.pub into /home/mailboxadm/.ssh/authorized_keys on the server
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub   # run on the server: host fingerprint</pre></li>
+              <li class="mb-3"><strong>In <code>.env</code></strong>:
+<pre class="cmd mt-2 mb-0">LINUX_USERS_ENABLED=True
+LINUX_SSH_HOST=66.116.244.109      # or host.docker.internal for the Docker host itself
+LINUX_SSH_USER=mailboxadm
+LINUX_SSH_KEY_FILE=/app/ssh/id_ed25519
+LINUX_SSH_HOST_FINGERPRINT=SHA256:...</pre></li>
+              <li><code>docker compose up -d</code>, then press <b>Test connection</b>.</li>
+            </ol>
+            <p class="mb-0 text-body-secondary">Users created here get a home folder and, with Dovecot/Postfix using system accounts, a mailbox. Choose <em>Mail only</em> unless they really need SSH access.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

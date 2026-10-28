@@ -1,0 +1,50 @@
+{% extends "panel/base.html" %}
+{% block panel_title %}Activity log{% endblock %}
+{% block content %}
+<div class="pane">
+  <div class="pane-head align-items-center">
+    <h1 class="pane-title me-auto">Activity log</h1>
+    <form class="d-flex gap-2 align-items-center" method="get">
+      <div class="form-check form-switch m-0 small">
+        <input class="form-check-input" type="checkbox" role="switch" name="failed" value="1" id="only-failed" {% if request.GET.failed %}checked{% endif %} onchange="this.form.submit()">
+        <label class="form-check-label" for="only-failed">Failures only</label>
+      </div>
+      <div class="input-group input-group-sm">
+        <span class="input-group-text bg-transparent"><i class="bi bi-search"></i></span>
+        <input class="form-control" name="q" value="{{ q }}" placeholder="Search the log">
+      </div>
+    </form>
+  </div>
+  <div class="panel-body">
+    <div class="card rounded-4 overflow-hidden">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle small">
+          <thead class="table-head"><tr><th style="width:150px">When</th><th>By</th><th>Action</th><th>Target</th><th>Result</th></tr></thead>
+          <tbody>
+            {% for l in page %}
+              <tr>
+                <td class="text-nowrap text-body-secondary" title="{{ l.created_at }}">{{ l.created_at|date:"M j, H:i:s" }}</td>
+                <td>{{ l.actor.email|default:l.actor.username|default:"system" }}</td>
+                <td>{{ l.action }}</td>
+                <td><code>{{ l.target }}</code></td>
+                <td>
+                  {% if l.ok %}<span class="text-success"><i class="bi bi-check-circle-fill"></i> ok</span>{% else %}<span class="text-danger"><i class="bi bi-x-circle-fill"></i> failed</span>{% endif %}
+                  {% if l.detail %}<div class="log-detail">{{ l.detail }}</div>{% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5" class="text-center text-body-secondary py-5">Nothing logged yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% if page.paginator.num_pages > 1 %}
+      <ul class="pagination pagination-sm mt-3">
+        {% if page.has_previous %}<li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&failed={{ request.GET.failed }}&page={{ page.previous_page_number }}">Newer</a></li>{% endif %}
+        {% if page.has_next %}<li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&failed={{ request.GET.failed }}&page={{ page.next_page_number }}">Older</a></li>{% endif %}
+      </ul>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{% block panel_title %}Admin{% endblock %} · Admin panel - {{ BRAND.NAME }} {{ BRAND.PRODUCT }}{% endblock %}
+{% block sidebar %}
+  <div class="px-3 pb-3 pt-1">
+    <a class="btn btn-outline-secondary rounded-pill w-100 d-flex align-items-center justify-content-center gap-2 back-to-mail" href="{% url 'home' %}">
+      <i class="bi bi-arrow-left"></i><span class="compose-label">Back to mail</span>
+    </a>
+  </div>
+  <div class="nav-section pt-1">Admin panel</div>
+  <nav class="nav flex-column folder-nav panel-nav">
+    <a href="{% url 'panel_users' %}" class="nav-link{% if section == 'users' %} active{% endif %}" title="Users">
+      <i class="bi bi-people{% if section == 'users' %}-fill{% endif %}"></i><span class="nav-label">Users</span><span class="nav-count"></span>
+    </a>
+    <a href="{% url 'panel_user_create' %}" class="nav-link" title="Add user">
+      <i class="bi bi-person-plus"></i><span class="nav-label">Add user</span><span class="nav-count"></span>
+    </a>
+    <a href="{% url 'panel_server' %}" class="nav-link{% if section == 'server' %} active{% endif %}" title="Ubuntu server">
+      <i class="bi bi-hdd-network{% if section == 'server' %}-fill{% endif %}"></i><span class="nav-label">Ubuntu server</span>
+      <span class="nav-count">{% if not linux_enabled %}<i class="bi bi-exclamation-circle-fill text-warning" title="Not configured"></i>{% endif %}</span>
+    </a>
+    <a href="{% url 'panel_logs' %}" class="nav-link{% if section == 'logs' %} active{% endif %}" title="Activity log">
+      <i class="bi bi-clock-history"></i><span class="nav-label">Activity log</span><span class="nav-count"></span>
+    </a>
+    <a href="{% url 'admin:index' %}" class="nav-link" title="Django admin">
+      <i class="bi bi-tools"></i><span class="nav-label">Django admin</span><span class="nav-count"><i class="bi bi-box-arrow-up-right small"></i></span>
+    </a>
+  </nav>
+{% endblock %}

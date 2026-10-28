@@ -1,0 +1,157 @@
+{% extends "panel/base.html" %}
+{% block panel_title %}{{ u.email|default:u.username }}{% endblock %}
+{% block content %}
+<div class="pane">
+  <div class="d-flex align-items-center gap-2 px-2 py-1 toolbar">
+    <a class="btn btn-icon" href="{% url 'panel_users' %}" title="Back to users"><i class="bi bi-arrow-left"></i></a>
+    <span class="avatar {% if u.is_active %}text-bg-primary{% else %}text-bg-secondary{% endif %}">{{ u.get_full_name|default:u.email|default:u.username|first|upper }}</span>
+    <div class="me-auto overflow-hidden">
+      <h1 class="h5 fw-normal mb-0 text-truncate">{{ u.get_full_name|default:u.email }}</h1>
+      <div class="small text-body-secondary">{{ u.email|default:"(no email - cannot sign in)" }}{% if not u.is_active %} · <span class="text-danger">inactive</span>{% endif %}</div>
+    </div>
+    {% if u.pk != request.user.pk %}
+      <button class="btn btn-outline-danger btn-sm rounded-pill px-3 me-2" type="button"
+              data-bs-toggle="modal" data-bs-target="#delete-user"
+              data-url="{% url 'panel_user_delete' u.pk %}" data-email="{{ u.email|default:u.username }}"
+              data-name="{{ u.get_full_name|default:u.email }}" data-mail="{{ accounts|length }}"
+              data-linux="{{ linux.username|default:'' }}"><i class="bi bi-trash me-1"></i>Delete user</button>
+    {% endif %}
+  </div>
+  <div class="panel-body">
+    <div class="row g-3" style="max-width: 1200px">
+      <!-- left column -->
+      <div class="col-lg-7">
+        <form method="post" class="card rounded-4 mb-3 overflow-hidden" novalidate>
+          <div class="card-header bg-transparent fw-semibold py-3"><i class="bi bi-person me-2"></i>Profile</div>
+          <div class="card-body">
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+            <div class="row gx-3">
+              <div class="col-md-12">{% include "mail/_field.html" with field=form.email %}</div>
+              <div class="col-md-6">{% include "mail/_field.html" with field=form.first_name %}</div>
+              <div class="col-md-6">{% include "mail/_field.html" with field=form.last_name %}</div>
+            </div>
+            <div class="d-flex flex-wrap gap-4">
+              {% include "mail/_field.html" with field=form.is_active %}
+              {% include "mail/_field.html" with field=form.is_staff %}
+            </div>
+            {% if linux %}<div class="form-text mt-n2 mb-3"><i class="bi bi-link-45deg"></i> Deactivating also locks the Linux user <code>{{ linux.username }}</code>; activating unlocks it.</div>{% endif %}
+            <button class="btn btn-primary rounded-pill px-4" type="submit" name="save" value="1">Save changes</button>
+          </div>
+        </form>
+
+        <form method="post" action="{% url 'panel_user_password' u.pk %}" class="card rounded-4 mb-3 overflow-hidden" novalidate>
+          <div class="card-header bg-transparent fw-semibold py-3"><i class="bi bi-key me-2"></i>Reset password</div>
+          <div class="card-body">
+            {% csrf_token %}
+            <div class="row gx-3">
+              <div class="col-md-6">{% include "mail/_field.html" with field=pw_form.password1 %}</div>
+              <div class="col-md-6">{% include "mail/_field.html" with field=pw_form.password2 %}</div>
+            </div>
+            {% if pw_form.also_linux %}{% include "mail/_field.html" with field=pw_form.also_linux %}{% endif %}
+            <button class="btn btn-outline-primary rounded-pill px-4" type="submit">Change password</button>
+          </div>
+        </form>
+
+        <div class="card rounded-4 mb-3 overflow-hidden">
+          <div class="card-header bg-transparent fw-semibold py-3"><i class="bi bi-envelope me-2"></i>Mail accounts</div>
+          <ul class="list-group list-group-flush">
+            {% for a in accounts %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-envelope-at me-2 text-body-secondary"></i>{{ a.email }} <span class="small text-body-secondary">· {{ a.imap_host }}</span></span>
+                {% if a.last_error %}<span class="badge bg-danger-subtle text-danger-emphasis" title="{{ a.last_error }}">sync error</span>
+                {% elif a.last_synced_at %}<span class="small text-body-secondary">synced {{ a.last_synced_at|timesince }} ago</span>{% endif %}
+              </li>
+            {% empty %}
+              <li class="list-group-item text-body-secondary small">No mail accounts yet. The user adds one after signing in.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+
+      <!-- right column -->
+      <div class="col-lg-5">
+        <div class="card rounded-4 mb-3 overflow-hidden{% if linux %} linux-card{% endif %}">
+          <div class="card-header bg-transparent fw-semibold py-3 d-flex align-items-center">
+            <i class="bi bi-ubuntu me-2"></i>Ubuntu server
+            {% if linux %}
+              <span class="ms-auto badge rounded-pill {% if linux.status == 'active' %}text-bg-success{% elif linux.status == 'locked' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ linux.get_status_display }}</span>
+            {% endif %}
+          </div>
+          <div class="card-body">
+            {% if linux %}
+              <dl class="row small mb-3">
+                <dt class="col-5 text-body-secondary fw-normal">Linux user</dt><dd class="col-7"><code>{{ linux.username }}</code></dd>
+                <dt class="col-5 text-body-secondary fw-normal">UID</dt><dd class="col-7">{{ linux.uid|default:"—" }}</dd>
+                <dt class="col-5 text-body-secondary fw-normal">Access</dt><dd class="col-7">{% if linux.can_login_shell %}Shell ({{ linux.shell }}){% else %}Mail only{% endif %}</dd>
+                <dt class="col-5 text-body-secondary fw-normal">Groups</dt><dd class="col-7">{{ linux.groups|default:"—" }}</dd>
+                <dt class="col-5 text-body-secondary fw-normal">Created</dt><dd class="col-7">{{ linux.created_at|date:"M j, Y H:i" }}</dd>
+              </dl>
+              {% if linux.last_error %}<div class="alert alert-danger small py-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ linux.last_error }}</div>{% endif %}
+              <div class="d-flex flex-wrap gap-2">
+                <form method="post" action="{% url 'panel_linux_action' u.pk 'check' %}">{% csrf_token %}
+                  <button class="btn btn-sm btn-outline-secondary rounded-pill"><i class="bi bi-arrow-repeat me-1"></i>Check on server</button></form>
+                {% if linux.status == 'locked' %}
+                  <form method="post" action="{% url 'panel_linux_action' u.pk 'unlock' %}">{% csrf_token %}
+                    <button class="btn btn-sm btn-outline-success rounded-pill"><i class="bi bi-unlock me-1"></i>Unlock</button></form>
+                {% else %}
+                  <form method="post" action="{% url 'panel_linux_action' u.pk 'lock' %}" data-confirm="Lock the Linux user '{{ linux.username }}'? They will not be able to log in or read mail on the server." data-confirm-ok="Lock">{% csrf_token %}
+                    <button class="btn btn-sm btn-outline-warning rounded-pill"><i class="bi bi-lock me-1"></i>Lock</button></form>
+                {% endif %}
+                <div class="dropdown">
+                  <button class="btn btn-sm btn-outline-danger rounded-pill dropdown-toggle" data-bs-toggle="dropdown">Remove</button>
+                  <div class="dropdown-menu dropdown-menu-end p-3 shadow" style="width: 300px">
+                    <form method="post" action="{% url 'panel_linux_action' u.pk 'delete' %}" data-confirm="Delete the Linux user '{{ linux.username }}' from the Ubuntu server?" data-confirm-ok="Delete">
+                      {% csrf_token %}
+                      <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="remove_home" id="rmhome"><label class="form-check-label small" for="rmhome">Also delete the home folder and stored mail</label></div>
+                      <button class="btn btn-sm btn-danger rounded-pill w-100">Delete Linux user</button>
+                    </form>
+                    <hr>
+                    <form method="post" action="{% url 'panel_linux_action' u.pk 'unlink' %}" data-confirm="Unlink '{{ linux.username }}'? The Linux user stays on the server, it is just no longer managed from here." data-confirm-ok="Unlink">
+                      {% csrf_token %}<button class="btn btn-sm btn-outline-secondary rounded-pill w-100">Only unlink (keep on server)</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            {% elif not linux_enabled %}
+              <p class="small text-body-secondary mb-2">This user has no Linux account.</p>
+              <a class="btn btn-sm btn-outline-primary rounded-pill" href="{% url 'panel_server' %}">Set up the server connection</a>
+            {% else %}
+              <p class="small text-body-secondary">This user has no Linux account yet. Create one now, or link a Linux user that already exists.</p>
+              <form method="post" action="{% url 'panel_linux_link' u.pk %}" novalidate>
+                {% csrf_token %}
+                {{ link_form.linux_create }}
+                {% include "mail/_field.html" with field=link_form.linux_username %}
+                {% include "mail/_field.html" with field=link_form.password1 %}
+                {% include "mail/_field.html" with field=link_form.linux_shell %}
+                {% include "mail/_field.html" with field=link_form.linux_groups %}
+                {% include "mail/_field.html" with field=link_form.link_existing %}
+                <button class="btn btn-primary btn-sm rounded-pill px-3"><i class="bi bi-plus-lg me-1"></i>Create on server</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card rounded-4 mb-3 overflow-hidden">
+          <div class="card-header bg-transparent fw-semibold py-3"><i class="bi bi-clock-history me-2"></i>Recent activity</div>
+          <ul class="list-group list-group-flush small">
+            {% for l in logs %}
+              <li class="list-group-item">
+                <div class="d-flex justify-content-between">
+                  <span>{% if l.ok %}<i class="bi bi-check-circle-fill text-success me-1"></i>{% else %}<i class="bi bi-x-circle-fill text-danger me-1"></i>{% endif %}{{ l.action }}</span>
+                  <span class="text-body-secondary" title="{{ l.created_at }}">{{ l.created_at|timesince }} ago</span>
+                </div>
+                {% if l.detail %}<div class="log-detail mt-1">{{ l.detail|truncatechars:200 }}</div>{% endif %}
+                <div class="text-body-secondary">by {{ l.actor.email|default:l.actor.username|default:"system" }}</div>
+              </li>
+            {% empty %}
+              <li class="list-group-item text-body-secondary">No activity yet.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}{% include "panel/_delete_modal.html" %}{% endblock %}

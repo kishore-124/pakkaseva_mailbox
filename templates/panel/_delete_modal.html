@@ -1,0 +1,62 @@
+<!-- delete user dialog -->
+<div class="modal fade" id="delete-user" tabindex="-1" aria-labelledby="delete-user-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="post" class="modal-content rounded-4" id="delete-user-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="modal-header border-0 pb-0">
+        <h1 class="modal-title fs-5" id="delete-user-title"><i class="bi bi-trash text-danger me-2"></i>Delete <span data-fill="name"></span>?</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">The login <code data-fill="email"></code> and its downloaded mail (<span data-fill="mail"></span> mail account(s)) will be removed from this app. This cannot be undone.</p>
+        <div class="linux-box on" id="delete-linux-box">
+          <div class="fw-semibold mb-2"><i class="bi bi-ubuntu me-1"></i>Ubuntu server - Linux user <code data-fill="linux"></code></div>
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" role="switch" name="del-also_linux" id="del-also-linux" checked>
+            <label class="form-check-label" for="del-also-linux">Also delete the Linux user on the server</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" name="del-remove_home" id="del-remove-home">
+            <label class="form-check-label" for="del-remove-home">Delete their home folder and stored mail too</label>
+          </div>
+          <div class="form-text" id="delete-linux-hint"></div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-danger rounded-pill px-4" id="delete-user-ok">Delete user</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+  (function () {
+    const modal = document.getElementById("delete-user");
+    const form = document.getElementById("delete-user-form");
+    const alsoLinux = document.getElementById("del-also-linux");
+    const removeHome = document.getElementById("del-remove-home");
+    const hint = document.getElementById("delete-linux-hint");
+    const okBtn = document.getElementById("delete-user-ok");
+    const refresh = () => {
+      removeHome.disabled = !alsoLinux.checked;
+      if (!alsoLinux.checked) removeHome.checked = false;
+      hint.textContent = !alsoLinux.checked ? "The Linux user stays on the server; it is only unlinked."
+        : removeHome.checked ? "The user, their files and their mailbox on the server are removed permanently."
+        : "The Linux user is removed; their home folder stays on the server.";
+      okBtn.textContent = alsoLinux.checked && !document.getElementById("delete-linux-box").hidden ? "Delete here and on server" : "Delete user";
+    };
+    modal.addEventListener("show.bs.modal", (e) => {
+      const b = e.relatedTarget;
+      form.action = b.dataset.url;
+      modal.querySelectorAll("[data-fill]").forEach(el => (el.textContent = b.dataset[el.dataset.fill] || ""));
+      const hasLinux = !!b.dataset.linux;
+      document.getElementById("delete-linux-box").hidden = !hasLinux;
+      alsoLinux.checked = hasLinux; removeHome.checked = false;
+      refresh();
+    });
+    alsoLinux.addEventListener("change", refresh);
+    removeHome.addEventListener("change", refresh);
+    form.addEventListener("submit", () => { okBtn.disabled = true; okBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting…'; });
+  })();
+</script>

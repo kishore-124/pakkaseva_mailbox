@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load mail_tags %}
+{% block content %}
+<div class="pane">
+  <div class="pane-head">
+    <h1 class="pane-title">{% if query %}Search results{% else %}{{ title }}{% endif %}</h1>
+    <span class="pane-sub">
+      {% if query %}for “{{ query }}”
+      {% elif folder and folder.unread_count %}{{ folder.unread_count }} unread
+      {% elif page.paginator.count %}{{ page.paginator.count }} conversation{{ page.paginator.count|pluralize }}{% endif %}
+    </span>
+  </div>
+  <div class="toolbar" id="list-toolbar">
+    <div class="select-box d-flex align-items-center rounded-3">
+      <div class="form-check m-0 ps-2 pe-1 d-flex align-items-center" title="Select">
+        <input class="form-check-input m-0" type="checkbox" id="select-all" aria-label="Select all">
+      </div>
+      <div class="dropdown">
+        <button class="btn btn-sm px-1 select-caret" data-bs-toggle="dropdown" aria-expanded="false" title="Select"><i class="bi bi-caret-down-fill"></i></button>
+        <ul class="dropdown-menu shadow">
+          <li><button class="dropdown-item" data-select="all">All</button></li>
+          <li><button class="dropdown-item" data-select="none">None</button></li>
+          <li><button class="dropdown-item" data-select="read">Read</button></li>
+          <li><button class="dropdown-item" data-select="unread">Unread</button></li>
+          <li><button class="dropdown-item" data-select="starred">Starred</button></li>
+          <li><button class="dropdown-item" data-select="unstarred">Unstarred</button></li>
+        </ul>
+      </div>
+    </div>
+    <div class="idle-actions d-flex align-items-center gap-1">
+      <button class="btn btn-icon" id="refresh-btn" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
+      <button class="btn btn-icon" data-bulk="read-all" title="Mark all as read"><i class="bi bi-check2-all"></i></button>
+    </div>
+    <div class="bulk-actions align-items-center gap-1" hidden>
+      <span class="small text-body-secondary me-1 selected-count" id="selected-count"></span>
+      {% if view != "archive" and view != "drafts" and view != "trash" and view != "spam" %}
+        <button class="btn btn-icon" data-action="archive" title="Archive"><i class="bi bi-archive"></i></button>
+      {% endif %}
+      {% if view == "spam" %}
+        <button class="btn btn-icon" data-action="inbox" title="Not spam"><i class="bi bi-envelope-check"></i></button>
+      {% elif view != "drafts" and view != "trash" %}
+        <button class="btn btn-icon" data-action="spam" title="Report spam"><i class="bi bi-exclamation-octagon"></i></button>
+      {% endif %}
+      {% if view == "trash" %}
+        <button class="btn btn-icon" data-action="inbox" title="Move to Inbox"><i class="bi bi-inbox"></i></button>
+        <button class="btn btn-icon" data-action="delete_forever" title="Delete forever"><i class="bi bi-trash3-fill"></i></button>
+      {% else %}
+        <button class="btn btn-icon" data-action="trash" title="Delete"><i class="bi bi-trash"></i></button>
+      {% endif %}
+      <div class="vr mx-1 my-2"></div>
+      <button class="btn btn-icon" data-action="read" title="Mark as read"><i class="bi bi-envelope-open"></i></button>
+      <button class="btn btn-icon" data-action="unread" title="Mark as unread"><i class="bi bi-envelope"></i></button>
+      <div class="dropdown">
+        <button class="btn btn-icon" data-bs-toggle="dropdown" aria-expanded="false" title="Move to"><i class="bi bi-folder-symlink"></i></button>
+        <ul class="dropdown-menu shadow">
+          <li><h6 class="dropdown-header">Move to:</h6></li>
+          {% for f in nav_account.folders.all %}{% if f.selectable and f.role != "all" and f.role != "flagged" and f.role != "important" and f.role != "drafts" %}
+            <li><button class="dropdown-item" data-action="move" data-folder="{{ f.pk }}"><i class="bi bi-{{ f.icon }} me-2"></i>{{ f.label }}</button></li>
+          {% endif %}{% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% if page.paginator.count %}
+      <div class="pager">
+        <span class="me-2">{{ page.start_index }}–{{ page.end_index }} of {{ page.paginator.count }}</span>
+        {% if page.has_previous %}<a class="btn btn-icon" href="?{% if query %}q={{ query|urlencode }}&amp;{% endif %}page={{ page.previous_page_number }}" title="Newer"><i class="bi bi-chevron-left"></i></a>{% else %}<button class="btn btn-icon" disabled><i class="bi bi-chevron-left"></i></button>{% endif %}
+        {% if page.has_next %}<a class="btn btn-icon" href="?{% if query %}q={{ query|urlencode }}&amp;{% endif %}page={{ page.next_page_number }}" title="Older"><i class="bi bi-chevron-right"></i></a>{% else %}<button class="btn btn-icon" disabled><i class="bi bi-chevron-right"></i></button>{% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  {% if view == "trash" %}<div class="pane-note"><i class="bi bi-info-circle"></i>Deleting a conversation from Trash removes it from the server for good.</div>{% endif %}
+  {% if nav_account.last_error %}
+    <div class="pane-note danger" role="alert">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <div>Mail could not be checked: {{ nav_account.last_error }} <a href="{% url 'account_edit' nav_account.pk %}">Check account settings</a></div>
+    </div>
+  {% endif %}
+
+  {% include "mail/_message_list.html" %}
+</div>
+{% endblock %}

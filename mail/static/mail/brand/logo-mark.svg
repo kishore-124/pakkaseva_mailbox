@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="easybillo">
+  <defs>
+    <linearGradient id="eb-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0c8b96"/>
+      <stop offset="1" stop-color="#065a63"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#eb-bg)"/>
+  <!-- lowercase "e" whose tail turns into an orange tick -->
+  <path d="M19.5 31h26.5" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M46 31A15 15 0 1 0 31 46" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M35.5 46.5l4.8 4.8 10-10.6" fill="none" stroke="#f5a300" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

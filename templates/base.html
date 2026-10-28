@@ -1,0 +1,262 @@
+{% load static %}<!doctype html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block title %}{% if title %}{{ title }} - {% endif %}{{ BRAND.NAME }} {{ BRAND.PRODUCT }}{% endblock %}</title>
+  <script>
+    /* apply saved / system colour theme before first paint */
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("theme"); } catch (e) {}
+      if (!t || t === "auto") t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-bs-theme", t);
+    })();
+  </script>
+  <link rel="icon" type="image/svg+xml" href="{% static BRAND.LOGO %}">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+  <link rel="stylesheet" href="{% static 'mail/app.css' %}">
+</head>
+<body class="{% block body_class %}app{% endblock %}">
+<div class="top-progress" id="top-progress" aria-hidden="true"></div>
+{% block body %}
+<div class="shell">
+  <aside class="offcanvas-lg offcanvas-start rail" tabindex="-1" id="sidebar" aria-label="Folders">
+    <div class="rail-head">
+      <a class="brand" href="{% url 'home' %}">{% include "mail/_brand.html" %}</a>
+      <button type="button" class="btn-close btn-close-white d-lg-none ms-auto" data-bs-dismiss="offcanvas" data-bs-target="#sidebar" aria-label="Close"></button>
+    </div>
+    <div class="rail-body">
+      {% block sidebar %}
+      <button class="btn compose-btn mb-3" id="compose-btn" type="button"><i class="bi bi-pencil"></i><span class="compose-label">Compose</span></button>
+      <nav class="nav flex-column folder-nav">
+        {% for item in nav_items %}
+          <a href="{% url 'folder_view' item.key %}" class="nav-link{% if view == item.key %} active{% endif %}{% if item.count and item.key != 'drafts' %} has-unread{% endif %}"
+             data-folder-id="{{ item.folder_id }}" data-key="{{ item.key }}" title="{{ item.label }}"{% if view == item.key %} aria-current="page"{% endif %}>
+            <i class="bi bi-{{ item.icon }}{% if view == item.key %}-fill{% endif %}"></i>
+            <span class="nav-label">{{ item.label }}</span>
+            <span class="nav-count">{% if item.count %}{{ item.count }}{% endif %}</span>
+          </a>
+        {% endfor %}
+      </nav>
+      {% if nav_labels %}
+        <div class="nav-section">Labels</div>
+        <nav class="nav flex-column folder-nav">
+          {% for f in nav_labels %}
+            <a href="{% url 'label_view' f.pk %}" class="nav-link{% if view == 'label' and folder.pk == f.pk %} active{% endif %}{% if f.unread_count %} has-unread{% endif %}"
+               data-folder-id="{{ f.pk }}" data-key="label" title="{{ f.display_name }}">
+              <i class="bi bi-tag{% if view == 'label' and folder.pk == f.pk %}-fill{% endif %}"></i>
+              <span class="nav-label">{{ f.short_label }}</span>
+              <span class="nav-count">{% if f.unread_count %}{{ f.unread_count }}{% endif %}</span>
+            </a>
+          {% endfor %}
+        </nav>
+      {% endif %}
+      {% endblock %}
+    </div>
+    <div class="rail-foot">
+      {% if is_panel_admin %}
+        <a href="{% url 'panel_users' %}" class="rail-link{% if section %} active{% endif %}" title="Admin panel"><i class="bi bi-shield-lock"></i><span class="nav-label">Admin panel</span></a>
+      {% endif %}
+      <div class="dropup">
+        <button class="rail-user" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="{{ user.email|default:user.username }}">
+          <span class="avatar avatar-me">{{ user.get_full_name|default:user.email|default:user.username|first|upper }}</span>
+          <span class="rail-user-text nav-label">
+            <span class="rail-user-name">{% firstof user.get_full_name nav_account.display_name user.email %}</span>
+            <span class="rail-user-mail">{{ nav_account.email|default:user.email }}</span>
+          </span>
+          <i class="bi bi-chevron-expand nav-label"></i>
+        </button>
+      <div class="dropdown-menu shadow account-menu p-2">
+        <div class="d-flex gap-3 align-items-center px-3 py-2 mb-2 border-bottom">
+          <span class="avatar avatar-lg text-bg-primary">{{ user.get_full_name|default:user.email|default:user.username|first|upper }}</span>
+          <div class="text-truncate"><div class="fw-semibold">{% firstof user.get_full_name nav_account.display_name user.email %}</div><div class="small text-body-secondary text-truncate">Signed in as {{ user.email|default:user.username }}</div></div>
+        </div>
+        {% for a in accounts %}{% if a.pk != nav_account.pk %}
+          <a class="dropdown-item rounded" href="{% url 'account_switch' a.pk %}"><i class="bi bi-arrow-left-right me-2"></i>{{ a.email }}</a>
+        {% endif %}{% endfor %}
+        <a class="dropdown-item rounded" href="{% url 'account_add' %}"><i class="bi bi-person-plus me-2"></i>Add another account</a>
+        <a class="dropdown-item rounded" href="{% url 'account_list' %}"><i class="bi bi-person-gear me-2"></i>Manage mail accounts</a>
+        {% if is_panel_admin %}<a class="dropdown-item rounded" href="{% url 'panel_users' %}"><i class="bi bi-shield-lock me-2"></i>Admin panel</a>{% endif %}
+        <button class="dropdown-item rounded d-sm-none" type="button" data-theme-cycle><i class="bi bi-circle-half me-2"></i>Switch light / dark</button>
+        <div class="dropdown-divider"></div>
+        <form method="post" action="{% url 'logout' %}">{% csrf_token %}
+          <button class="dropdown-item rounded" type="submit"><i class="bi bi-box-arrow-right me-2"></i>Sign out</button>
+        </form>
+      </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="workspace">
+    <header class="topbar">
+      <button class="btn btn-icon d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar" title="Main menu"><i class="bi bi-list"></i></button>
+      <button class="btn btn-icon d-none d-lg-inline-flex" type="button" id="menu-toggle" title="Collapse sidebar"><i class="bi bi-layout-sidebar"></i></button>
+      <a class="brand d-lg-none" href="{% url 'home' %}"><span class="brand-logo"><img src="{% static BRAND.LOGO %}" alt="{{ BRAND.NAME }}" width="32" height="32"></span></a>
+  <form class="app-search flex-grow-1 position-relative" id="search-form" action="{% url 'folder_view' 'search' %}" method="get" role="search">
+    <div class="input-group search-group">
+      <button class="btn btn-icon" type="submit" title="Search"><i class="bi bi-search"></i></button>
+      <input class="form-control" name="q" id="search-input" value="{{ query|default:'' }}" placeholder="Search mail" autocomplete="off" aria-label="Search mail">
+      {% if query %}<a class="btn btn-icon" href="{% url 'folder_view' 'inbox' %}" title="Clear search"><i class="bi bi-x-lg"></i></a>{% endif %}
+      <button class="btn btn-icon d-none d-sm-inline-flex" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Show search options"><i class="bi bi-sliders"></i></button>
+      <div class="dropdown-menu dropdown-menu-end search-options p-4 shadow">
+        <div class="row g-2 align-items-center" id="search-options">
+          <label class="col-4 col-form-label-sm text-body-secondary">From</label><div class="col-8"><input class="form-control form-control-sm" data-op="from"></div>
+          <label class="col-4 col-form-label-sm text-body-secondary">To</label><div class="col-8"><input class="form-control form-control-sm" data-op="to"></div>
+          <label class="col-4 col-form-label-sm text-body-secondary">Subject</label><div class="col-8"><input class="form-control form-control-sm" data-op="subject"></div>
+          <label class="col-4 col-form-label-sm text-body-secondary">Has the words</label><div class="col-8"><input class="form-control form-control-sm" data-op=""></div>
+          <label class="col-4 col-form-label-sm text-body-secondary">Date after</label><div class="col-8"><input type="date" class="form-control form-control-sm" data-op="after"></div>
+          <label class="col-4 col-form-label-sm text-body-secondary">Date before</label><div class="col-8"><input type="date" class="form-control form-control-sm" data-op="before"></div>
+          <div class="col-8 offset-4">
+            <div class="form-check"><input class="form-check-input" type="checkbox" data-op="has" value="attachment" id="so-att"><label class="form-check-label" for="so-att">Has attachment</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" data-op="is" value="unread" id="so-unread"><label class="form-check-label" for="so-unread">Unread only</label></div>
+          </div>
+          <div class="col-12 text-end mt-3"><button type="button" class="btn btn-primary rounded-pill px-4" id="search-options-go">Search</button></div>
+        </div>
+      </div>
+    </div>
+  </form>
+      <div class="topbar-actions">
+        <span class="sync-status d-none d-md-inline" id="sync-status"></span>
+        <button class="btn btn-icon d-none d-sm-inline-flex" type="button" data-bs-toggle="modal" data-bs-target="#shortcuts" title="Keyboard shortcuts (?)"><i class="bi bi-keyboard"></i></button>
+    <div class="dropdown">
+      <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Quick settings"><i class="bi bi-gear"></i></button>
+      <div class="dropdown-menu dropdown-menu-end shadow quick-settings p-0">
+        <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-2">
+          <span class="fw-bold">Quick settings</span>
+          <a class="btn btn-sm btn-outline-primary rounded-pill" href="{% url 'account_list' %}">All settings</a>
+        </div>
+        <div class="px-3 pb-2">
+          <div class="qs-title">Theme</div>
+          <div class="btn-group w-100" role="group" aria-label="Theme">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-theme="light"><i class="bi bi-sun me-1"></i>Light</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-theme="dark"><i class="bi bi-moon-stars me-1"></i>Dark</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-theme="auto"><i class="bi bi-circle-half me-1"></i>Auto</button>
+          </div>
+          <div class="qs-title mt-3">Density</div>
+          <div class="list-group list-group-flush">
+            <label class="list-group-item d-flex gap-2 px-0 border-0 py-1"><input class="form-check-input" type="radio" name="density" value="default"> Default <span class="text-body-secondary small ms-auto">two lines, with avatars</span></label>
+            <label class="list-group-item d-flex gap-2 px-0 border-0 py-1"><input class="form-check-input" type="radio" name="density" value="compact"> Compact <span class="text-body-secondary small ms-auto">one line each</span></label>
+          </div>
+          <div class="qs-title mt-3">Reading</div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="qs-snippets" checked>
+            <label class="form-check-label" for="qs-snippets">Show message previews</label>
+          </div>
+        </div>
+        {% if is_panel_admin %}
+          <div class="border-top px-3 py-2">
+            <a class="btn btn-sm btn-link px-0 text-decoration-none" href="{% url 'panel_users' %}"><i class="bi bi-shield-lock me-1"></i>Admin panel</a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+      </div>
+    </header>
+
+    <main class="app-main" id="main">
+      {% for m in messages %}
+      <div class="alert alert-{% if m.tags == 'error' %}danger{% else %}{{ m.tags|default:'info' }}{% endif %} alert-dismissible fade show rounded-4 mb-2 d-flex gap-2 align-items-start flash" role="alert">
+        <i class="bi bi-{% if m.tags == 'success' %}check-circle-fill{% elif m.tags == 'error' %}exclamation-octagon-fill{% elif m.tags == 'warning' %}exclamation-triangle-fill{% else %}info-circle-fill{% endif %} mt-1"></i>
+        <div>{{ m }}</div><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+{% if nav_account %}{% include "mail/_compose.html" %}{% endif %}
+
+<!-- toast -->
+<div class="toast-container position-fixed bottom-0 start-0 p-3">
+  <div class="toast app-toast align-items-center text-bg-dark border-0" id="toast" role="status" aria-live="polite" aria-atomic="true">
+    <div class="d-flex align-items-center">
+      <div class="toast-body flex-grow-1" id="toast-text"></div>
+      <button type="button" class="btn btn-link link-info fw-semibold text-decoration-none" id="toast-action" hidden></button>
+      <button type="button" class="btn-close btn-close-white me-2" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+
+<!-- keyboard shortcuts -->
+<div class="modal fade" id="shortcuts" tabindex="-1" aria-labelledby="shortcuts-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0"><h1 class="modal-title fs-5" id="shortcuts-title"><i class="bi bi-keyboard me-2"></i>Keyboard shortcuts</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body pt-0">
+        <div class="row">
+          <div class="col-md-6">
+            <h2 class="h6 text-body-secondary mt-2">Navigation</h2>
+            <dl class="kbd-list">
+              <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous conversation</dd>
+              <dt><kbd>o</kbd> or <kbd>Enter</kbd></dt><dd>Open conversation</dd>
+              <dt><kbd>u</kbd></dt><dd>Back to the list</dd>
+              <dt><kbd>/</kbd></dt><dd>Search mail</dd>
+              <dt><kbd>g</kbd> then <kbd>i</kbd> / <kbd>s</kbd> / <kbd>t</kbd> / <kbd>d</kbd></dt><dd>Go to Inbox / Starred / Sent / Drafts</dd>
+              <dt><kbd>?</kbd></dt><dd>Show this help</dd>
+            </dl>
+          </div>
+          <div class="col-md-6">
+            <h2 class="h6 text-body-secondary mt-2">Actions</h2>
+            <dl class="kbd-list">
+              <dt><kbd>c</kbd></dt><dd>Compose</dd>
+              <dt><kbd>r</kbd> / <kbd>a</kbd> / <kbd>f</kbd></dt><dd>Reply / reply all / forward</dd>
+              <dt><kbd>x</kbd></dt><dd>Select conversation</dd>
+              <dt><kbd>s</kbd></dt><dd>Star / unstar</dd>
+              <dt><kbd>e</kbd></dt><dd>Archive</dd>
+              <dt><kbd>#</kbd></dt><dd>Delete</dd>
+              <dt><kbd>Shift</kbd>+<kbd>i</kbd> / <kbd>Shift</kbd>+<kbd>u</kbd></dt><dd>Mark read / unread</dd>
+              <dt><kbd>Ctrl</kbd>+<kbd>Enter</kbd></dt><dd>Send (in compose)</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- confirm / prompt dialog -->
+<div class="modal fade" id="dialog" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content rounded-4" id="dialog-form">
+      <div class="modal-header border-0 pb-0"><h1 class="modal-title fs-5" id="dialog-title">Confirm</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <p class="mb-2" id="dialog-text"></p>
+        <input class="form-control" id="dialog-input" hidden>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary rounded-pill px-4" id="dialog-ok">OK</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+<script>
+  window.MAILBOX = {
+    accountId: "{{ nav_account.pk|default:'' }}",
+    accountEmail: "{{ nav_account.email|default:''|escapejs }}",
+    view: "{{ view|default:''|escapejs }}",
+    folderId: "{{ folder.pk|default:'' }}",
+    urls: {
+      actions: "{% url 'api_actions' %}",
+      sync: "{% url 'api_sync' %}",
+      counts: "{% url 'api_counts' %}",
+      contacts: "{% url 'api_contacts' %}",
+      composeData: "{% url 'api_compose_data' %}",
+      send: "{% url 'api_send' %}",
+      draft: "{% url 'api_draft' %}"
+    }
+  };
+</script>
+<script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'mail/app.js' %}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

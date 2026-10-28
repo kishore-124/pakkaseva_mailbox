@@ -1,0 +1,136 @@
+#!/bin/bash
+# mailbox-user - restricted helper that lets the Mailbox web app manage Linux users.
+#
+# Install on the Ubuntu server (see tools/server/README.md):
+#   sudo install -o root -g root -m 0755 mailbox-user /usr/local/sbin/mailbox-user
+#   echo 'mailboxadm ALL=(root) NOPASSWD: /usr/local/sbin/mailbox-user' | sudo tee /etc/sudoers.d/mailbox-user
+#   sudo chmod 0440 /etc/sudoers.d/mailbox-user
+#
+# Usage (passwords are read from standard input, never from the command line):
+#   mailbox-user ping
+#   mailbox-user exists  <name>
+#   mailbox-user create  <name> [--shell SHELL] [--groups g1,g2] [--comment TEXT]   < password
+#   mailbox-user passwd  <name>                                                     < password
+#   mailbox-user lock    <name>
+#   mailbox-user unlock  <name>
+#   mailbox-user delete  <name> [--remove-home]
+#
+# Safety rules: names must look like normal login names, and only ordinary users
+# (UID >= UID_MIN from /etc/login.defs, usually 1000) can be changed, locked or deleted.
+# root and other system accounts can never be touched through this script.
+
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+umask 077
+
+die() { echo "ERROR: $1" >&2; exit "${2:-1}"; }
+
+[ "$(id -u)" -eq 0 ] || die "must be run as root (through sudo)" 3
+
+NAME_RE='^[a-z_][a-z0-9_-]{0,31}$'
+GROUP_RE='^[a-z_][a-z0-9_-]{0,31}$'
+RESERVED="root daemon bin sys sync games man lp mail news uucp proxy www-data backup list irc gnats nobody \
+systemd-network systemd-resolve systemd-timesync messagebus syslog _apt sshd dovecot dovenull postfix ubuntu admin"
+
+UID_MIN=$(awk '/^UID_MIN/ {print $2}' /etc/login.defs 2>/dev/null || true)
+UID_MIN=${UID_MIN:-1000}
+
+valid_name() {
+  [[ "$1" =~ $NAME_RE ]] || die "invalid user name '$1' (use lowercase letters, digits, '_' or '-', max 32 chars)" 2
+  for r in $RESERVED; do [ "$1" = "$r" ] && die "'$1' is a reserved system account" 2; done
+  return 0
+}
+
+managed_user() {   # the user must exist and be an ordinary (non-system) account
+  local uid
+  uid=$(id -u "$1" 2>/dev/null) || die "user '$1' does not exist" 4
+  { [ "$uid" -ge "$UID_MIN" ] && [ "$uid" -ne 65534 ]; } || die "refusing to modify system account '$1' (uid $uid)" 5
+}
+
+read_password() {
+  local pw
+  IFS= read -r pw || true
+  [ -n "$pw" ] || die "no password given on standard input" 2
+  [ "${#pw}" -le 256 ] || die "password too long" 2
+  case "$pw" in *:*|*$'\r'*) die "password must not contain ':' or carriage returns" 2 ;; esac
+  printf '%s' "$pw"
+}
+
+cmd=${1:-}; shift || true
+
+case "$cmd" in
+  ping)
+    echo "ok $(hostname) uid_min=$UID_MIN"
+    ;;
+
+  exists)
+    name=${1:-}; valid_name "$name"
+    if id -u "$name" >/dev/null 2>&1; then echo "yes uid=$(id -u "$name")"; else echo "no"; fi
+    ;;
+
+  create)
+    name=${1:-}; shift || true; valid_name "$name"
+    shell=/usr/sbin/nologin; groups=""; comment=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --shell)   shell=${2:-}; shift 2 ;;
+        --groups)  groups=${2:-}; shift 2 ;;
+        --comment) comment=${2:-}; shift 2 ;;
+        *) die "unknown option $1" 2 ;;
+      esac
+    done
+    if [ "$shell" != /usr/sbin/nologin ] && ! grep -qxF "$shell" /etc/shells; then die "shell '$shell' is not listed in /etc/shells" 2; fi
+    comment=$(printf '%s' "$comment" | tr -cd '[:alnum:] ._@-' | cut -c1-80)
+    args=(-m -s "$shell")
+    [ -n "$comment" ] && args+=(-c "$comment")
+    if [ -n "$groups" ]; then
+      IFS=',' read -ra glist <<< "$groups"
+      for g in "${glist[@]}"; do
+        [[ "$g" =~ $GROUP_RE ]] || die "invalid group name '$g'" 2
+        case " sudo adm root wheel shadow disk admin lxd docker " in *" $g "*) die "group '$g' is not allowed" 2 ;; esac
+        getent group "$g" >/dev/null || die "group '$g' does not exist" 2
+      done
+      args+=(-G "$groups")
+    fi
+    id -u "$name" >/dev/null 2>&1 && die "user '$name' already exists" 6
+    pw=$(read_password)
+    useradd "${args[@]}" "$name"
+    if ! printf '%s:%s\n' "$name" "$pw" | chpasswd; then
+      userdel -r "$name" >/dev/null 2>&1 || true
+      die "could not set password (user was not created)" 7
+    fi
+    echo "created $name uid=$(id -u "$name") home=$(getent passwd "$name" | cut -d: -f6)"
+    ;;
+
+  passwd)
+    name=${1:-}; valid_name "$name"; managed_user "$name"
+    pw=$(read_password)
+    printf '%s:%s\n' "$name" "$pw" | chpasswd
+    echo "password changed for $name"
+    ;;
+
+  lock)
+    name=${1:-}; valid_name "$name"; managed_user "$name"
+    usermod -L -e 1 "$name"
+    echo "locked $name"
+    ;;
+
+  unlock)
+    name=${1:-}; valid_name "$name"; managed_user "$name"
+    usermod -U -e '' "$name"
+    echo "unlocked $name"
+    ;;
+
+  delete)
+    name=${1:-}; shift || true; valid_name "$name"; managed_user "$name"
+    args=()
+    [ "${1:-}" = "--remove-home" ] && args+=(-r)
+    pkill -KILL -u "$name" >/dev/null 2>&1 || true
+    userdel "${args[@]}" "$name" 2>/dev/null || userdel "$name"
+    echo "deleted $name"
+    ;;
+
+  *)
+    die "usage: mailbox-user {ping|exists|create|passwd|lock|unlock|delete} ..." 2
+    ;;
+esac

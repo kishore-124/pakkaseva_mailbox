@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Sign in - {{ BRAND.NAME }} {{ BRAND.PRODUCT }}{% endblock %}
+{% block body_class %}auth{% endblock %}
+{% block body %}
+<div class="auth-shell">
+  {% include "registration/_auth_aside.html" %}
+  <main class="auth-main">
+    <div class="auth-form">
+      <div class="auth-mobile-brand brand brand-lg">{% include "mail/_brand.html" %}</div>
+      <h2>Sign in</h2>
+      <p class="lead-text">Use your email address and password.</p>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.errors %}<div class="alert alert-danger d-flex gap-2 py-2"><i class="bi bi-exclamation-circle-fill mt-1"></i><div>{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div></div>{% endif %}
+        <div class="form-floating mb-3">{{ form.username }}<label for="id_username">Email address</label></div>
+        <div class="form-floating mb-4">{{ form.password }}<label for="id_password">Password</label></div>
+        <input type="hidden" name="next" value="{{ next }}">
+        <button class="btn btn-primary w-100" type="submit">Sign in</button>
+      </form>
+      {% if allow_signup %}<p class="auth-switch">New here? <a href="{% url 'signup' %}">Create an account</a></p>{% endif %}
+    </div>
+  </main>
+</div>
+{% endblock %}

@@ -1,0 +1,7 @@
+.env
+ssh/id_*
+media/
+staticfiles/
+__pycache__/
+
+.idea/*
